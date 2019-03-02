@@ -1,8 +1,11 @@
-package go_ec2_proxy
+package create
 
-import "encoding/base64"
+import (
+	"encoding/base64"
+	"github.com/denverquane/go-ec2-proxy/common"
+)
 
-func CreateGoProxyScriptString(proxyConfig ProxyConfig) string {
+func CreateGoProxyScriptString(proxyConfig common.ProxyConfig) string {
 	command := ""
 
 	if proxyConfig.User != "" {
