@@ -11,7 +11,7 @@ import (
 	"time"
 )
 
-func ListNetworkThroughputForInstance(creds *credentials.Credentials, region common.Region, instanceID string) {
+func ListNetworkThroughputForInstance(creds *credentials.Credentials, region common.Region, instanceID string) (float64, float64) {
 	sess, _ := session.NewSession(&aws.Config{
 		Region:      aws.String(string(region)),
 		Credentials: creds,
@@ -21,7 +21,7 @@ func ListNetworkThroughputForInstance(creds *credentials.Credentials, region com
 	svc := cloudwatch.New(sess)
 	now := time.Now()
 	start := now.AddDate(0, 0, -1)
-	var avg string = "Sum"
+	var avg = "Sum"
 	var period int64 = 60
 	input := cloudwatch.GetMetricStatisticsInput{
 		EndTime:    &now,
@@ -45,7 +45,8 @@ func ListNetworkThroughputForInstance(creds *credentials.Credentials, region com
 	if err != nil {
 		log.Println(err)
 	}
-	fmt.Println("Metrics", result)
+	fmt.Println("NetworkIn", result.Datapoints)
+	totalIn := sumDatapointsByUnit(result.Datapoints, "Bytes")
 
 	input.SetMetricName("NetworkOut")
 
@@ -54,5 +55,18 @@ func ListNetworkThroughputForInstance(creds *credentials.Credentials, region com
 	if err != nil {
 		log.Println(err)
 	}
-	fmt.Println("Metrics", result)
+	fmt.Println("NetworkOut", result.Datapoints)
+
+	totalOut := sumDatapointsByUnit(result.Datapoints, "Bytes")
+	return totalIn, totalOut
+}
+
+func sumDatapointsByUnit(data []*cloudwatch.Datapoint, unit string) float64 {
+	sum := 0.0
+	for _, v := range data {
+		if *v.Unit == unit {
+			sum += *v.Sum
+		}
+	}
+	return sum
 }
