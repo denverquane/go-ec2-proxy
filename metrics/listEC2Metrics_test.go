@@ -19,7 +19,7 @@ func TestListNetworkThroughputForInstance(t *testing.T) {
 
 	creds := credentials.NewStaticCredentials(os.Getenv("CLOUDWATCH_ACCESS_KEY_ID"), os.Getenv("CLOUDWATCH_SECRET_ACCESS_KEY"), "")
 
-	in, out := ListNetworkThroughputForInstance(creds, common.USWest1, "i-0cc634284080bf8d7")
+	in, out := FetchNetworkThroughputForInstance(creds, common.USWest1, "i-0cc634284080bf8d7")
 	fmt.Println(strconv.FormatFloat(in/1000000000.0, 'f', -1, 64) + "Gb in")
 	fmt.Println(strconv.FormatFloat(out/1000000000.0, 'f', -1, 64) + "Gb out")
 }

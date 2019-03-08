@@ -58,17 +58,17 @@ func FindOrCreateSecurityGroup(creds *credentials.Credentials, region common.Reg
 			input := &ec2.AuthorizeSecurityGroupIngressInput{
 				GroupId: aws.String(*createResult.GroupId),
 				IpPermissions: []*ec2.IpPermission{
-					//{
-					//	FromPort:   aws.Int64(22),
-					//	IpProtocol: aws.String("tcp"),
-					//	IpRanges: []*ec2.IpRange{
-					//		{
-					//			CidrIp:      aws.String("0.0.0.0/0"),
-					//			Description: aws.String("SSH access"),
-					//		},
-					//	},
-					//	ToPort: aws.Int64(22),
-					//},
+					{
+						FromPort:   aws.Int64(22),
+						IpProtocol: aws.String("tcp"),
+						IpRanges: []*ec2.IpRange{
+							{
+								CidrIp:      aws.String("0.0.0.0/0"),
+								Description: aws.String("SSH access"),
+							},
+						},
+						ToPort: aws.Int64(22),
+					},
 					{
 						FromPort:   aws.Int64(int64(portInt)),
 						IpProtocol: aws.String("tcp"),

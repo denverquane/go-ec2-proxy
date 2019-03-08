@@ -21,7 +21,7 @@ func TestCreateProxy(t *testing.T) {
 
 	serverConfig := common.CreateServerConfig(common.USWest1, common.Micro)
 
-	instance, err := CreateAndStartProxyServer(creds, proxyConfig, serverConfig)
+	instance, err := CreateAndStartProxyServer(creds, proxyConfig, serverConfig, "")
 
 	log.Println("Instance ID: " + *instance.InstanceId)
 

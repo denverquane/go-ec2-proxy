@@ -11,7 +11,7 @@ import (
 	"time"
 )
 
-func ListNetworkThroughputForInstance(creds *credentials.Credentials, region common.Region, instanceID string) (float64, float64) {
+func FetchNetworkThroughputForInstance(creds *credentials.Credentials, region common.Region, instanceID string) (float64, float64) {
 	sess, _ := session.NewSession(&aws.Config{
 		Region:      aws.String(string(region)),
 		Credentials: creds,

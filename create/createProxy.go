@@ -11,7 +11,7 @@ import (
 	"time"
 )
 
-func CreateAndStartProxyServer(creds *credentials.Credentials, proxyConfig common.ProxyConfig, serverConfig common.ServerConfig) (*ec2.Instance, error) {
+func CreateAndStartProxyServer(creds *credentials.Credentials, proxyConfig common.ProxyConfig, serverConfig common.ServerConfig, sgGroupId string) (*ec2.Instance, error) {
 	sess, err := session.NewSession(&aws.Config{
 		Region:      aws.String(string(serverConfig.Region)),
 		Credentials: creds,
@@ -30,6 +30,9 @@ func CreateAndStartProxyServer(creds *credentials.Credentials, proxyConfig commo
 		MinCount:     aws.Int64(1),
 		MaxCount:     aws.Int64(1),
 		UserData:     &script,
+		SecurityGroupIds: []*string{
+			aws.String(sgGroupId),
+		},
 	})
 
 	if err != nil {
