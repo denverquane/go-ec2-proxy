@@ -3,7 +3,6 @@ package destroy
 import (
 	"fmt"
 	"github.com/aws/aws-sdk-go/aws"
-	"github.com/aws/aws-sdk-go/aws/credentials"
 	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/aws/aws-sdk-go/service/ec2"
 	"github.com/denverquane/go-ec2-proxy/common"
@@ -11,10 +10,14 @@ import (
 	"time"
 )
 
-func TerminateInstance(creds *credentials.Credentials, serverConfig common.ServerConfig, instance string) {
+func TerminateInstance(region common.Region, instanceId string) {
+	ec2Creds, err := common.GetCredentialsFromEnvironment("EC2_ACCESS_KEY_ID", "EC2_SECRET_ACCESS_KEY")
+	if err != nil {
+		log.Println(err)
+	}
 	sess, _ := session.NewSession(&aws.Config{
-		Region:      aws.String(string(serverConfig.Region)),
-		Credentials: creds,
+		Region:      aws.String(string(region)),
+		Credentials: ec2Creds,
 	},
 	)
 
@@ -23,17 +26,17 @@ func TerminateInstance(creds *credentials.Credentials, serverConfig common.Serve
 
 	input := ec2.TerminateInstancesInput{
 		InstanceIds: []*string{
-			&instance,
+			&instanceId,
 		},
 	}
 
-	_, err := svc.TerminateInstances(&input)
+	_, err = svc.TerminateInstances(&input)
 	if err != nil {
 		log.Println(err)
 	} else {
 		params := &ec2.DescribeInstancesInput{
 			InstanceIds: []*string{
-				&instance,
+				&instanceId,
 			},
 		}
 
@@ -46,5 +49,6 @@ func TerminateInstance(creds *credentials.Credentials, serverConfig common.Serve
 			fmt.Println("Proxy isn't destroyed yet, sleeping for 5 seconds...")
 			time.Sleep(5 * time.Second)
 		}
+		log.Println("Server " + instanceId + " terminated")
 	}
 }

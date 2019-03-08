@@ -83,7 +83,7 @@ func FindOrCreateSecurityGroup(creds *credentials.Credentials, region common.Reg
 				},
 			}
 
-			result, err := svc.AuthorizeSecurityGroupIngress(input)
+			_, err := svc.AuthorizeSecurityGroupIngress(input)
 			if err != nil {
 				if aerr, ok := err.(awserr.Error); ok {
 					switch aerr.Code() {
@@ -98,7 +98,6 @@ func FindOrCreateSecurityGroup(creds *credentials.Credentials, region common.Reg
 				return ""
 			} else {
 				log.Println("Successfully added ingress rule for Security Group " + *createResult.GroupId)
-				fmt.Println(result)
 			}
 
 			return *createResult.GroupId

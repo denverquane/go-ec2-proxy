@@ -45,7 +45,7 @@ func CreateAndStartProxyServer(creds *credentials.Credentials, proxyConfig commo
 		return &ec2.Instance{}, err
 	}
 
-	fmt.Println("Created instance", *runResult.Instances[0].InstanceId)
+	log.Println("Created instance " + *runResult.Instances[0].InstanceId + ", waiting for running status...")
 
 	// Add tags to the created instance
 	_, errtag := svc.CreateTags(&ec2.CreateTagsInput{
@@ -59,10 +59,24 @@ func CreateAndStartProxyServer(creds *credentials.Credentials, proxyConfig commo
 	})
 	if errtag != nil {
 		log.Println("Could not create tags for instance", runResult.Instances[0].InstanceId, errtag)
-		return &ec2.Instance{}, errtag
+		log.Println("Sleeping for 3 seconds, then retrying tag...")
+		time.Sleep(3 * time.Second)
+		_, errtag := svc.CreateTags(&ec2.CreateTagsInput{
+			Resources: []*string{runResult.Instances[0].InstanceId},
+			Tags: []*ec2.Tag{
+				{
+					Key:   aws.String("Name"),
+					Value: aws.String("Goproxy Node " + handle),
+				},
+			},
+		})
+		if errtag != nil {
+			log.Println("STILL couldn't tag instance: " + *runResult.Instances[0].InstanceId)
+			return &ec2.Instance{}, errtag
+		}
 	}
 
-	fmt.Println("Successfully tagged instance")
+	//fmt.Println("Successfully tagged instance")
 
 	params := &ec2.DescribeInstancesInput{
 		InstanceIds: []*string{
@@ -83,7 +97,7 @@ func CreateAndStartProxyServer(creds *credentials.Credentials, proxyConfig commo
 		res := result.Reservations[0]
 		inst := res.Instances[0]
 		status = *inst.State.Name
-		fmt.Println("Proxy isn't running yet, sleeping for 2 seconds...")
+		//fmt.Println("Proxy isn't running yet, sleeping for 2 seconds...")
 		time.Sleep(time.Second * 2)
 	}
 
