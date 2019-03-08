@@ -25,7 +25,7 @@ Requires=network.target
 Type=simple
 User=ubuntu
 WorkingDirectory=/home/ubuntu
-ExecStart=/bin/bash -lc '/usr/bin/proxy` + command +
+ExecStart=/bin/bash -lc '/usr/bin/proxy ` + command +
 		`'
 TimeoutSec=15
 Restart=always
@@ -39,6 +39,8 @@ sudo systemctl start proxy.service
 
 # Print status
 sudo systemctl status proxy.service --no-pager`
+
+	//fmt.Println(cmdString)
 
 	return base64.StdEncoding.EncodeToString([]byte(cmdString))
 }

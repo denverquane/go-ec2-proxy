@@ -9,7 +9,7 @@ import (
 	"github.com/denverquane/go-ec2-proxy/common"
 )
 
-func CreateKeyPair(creds *credentials.Credentials, region common.Region) {
+func CreateKeyPair(creds *credentials.Credentials, region common.Region, name string) {
 	sess, _ := session.NewSession(&aws.Config{
 		Region:      aws.String(string(region)),
 		Credentials: creds,
@@ -20,9 +20,10 @@ func CreateKeyPair(creds *credentials.Credentials, region common.Region) {
 	svc := ec2.New(sess)
 
 	input := ec2.CreateKeyPairInput{
-		KeyName: aws.String("Asd"),
+		KeyName: aws.String(name),
 	}
 
 	out, _ := svc.CreateKeyPair(&input)
+	fmt.Println("Made keypair")
 	fmt.Println(out)
 }

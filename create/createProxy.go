@@ -23,6 +23,10 @@ func CreateAndStartProxyServer(creds *credentials.Credentials, proxyConfig commo
 
 	script := CreateGoProxyScriptString(proxyConfig)
 
+	handle := common.GenerateUniqueInstanceHandle(proxyConfig, serverConfig)
+
+	//CreateKeyPair(creds, common.USWest1, handle + "_keypair")
+
 	// Specify the details of the instance that you want to create.
 	runResult, err := svc.RunInstances(&ec2.RunInstancesInput{
 		ImageId:      aws.String(serverConfig.GetAmi()),
@@ -33,6 +37,7 @@ func CreateAndStartProxyServer(creds *credentials.Credentials, proxyConfig commo
 		SecurityGroupIds: []*string{
 			aws.String(sgGroupId),
 		},
+		//KeyName: aws.String(handle + "_keypair"),
 	})
 
 	if err != nil {
@@ -41,8 +46,6 @@ func CreateAndStartProxyServer(creds *credentials.Credentials, proxyConfig commo
 	}
 
 	fmt.Println("Created instance", *runResult.Instances[0].InstanceId)
-
-	handle := common.GenerateUniqueInstanceHandle(proxyConfig, serverConfig)
 
 	// Add tags to the created instance
 	_, errtag := svc.CreateTags(&ec2.CreateTagsInput{
