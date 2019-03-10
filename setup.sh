@@ -3,8 +3,8 @@
 # Update system
 sudo apt update
 
-# Install goproxy
-curl -L https://raw.githubusercontent.com/snail007/goproxy/master/install_auto.sh | sudo bash
+# Fetch latest release
+https://github.com/denverquane/go-ec2-proxy/releases/download/0.0.1/linux_amd64
 
 # Define settings variables
 USER_NAME=$1

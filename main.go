@@ -45,6 +45,8 @@ func main() {
 	//}
 }
 
+//TODO Generate JWT in Lambda, and use fields here to ensure that the right proxy(ies) get created
+
 func RunServer(port string) {
 	muxx := makeMuxRouter()
 
