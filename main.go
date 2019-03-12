@@ -1,8 +1,13 @@
 package main
 
 import (
+	"encoding/json"
+	"errors"
 	"fmt"
+	"github.com/denverquane/go-ec2-proxy/common"
+	"github.com/denverquane/go-ec2-proxy/management"
 	"github.com/dgrijalva/jwt-go"
+	"github.com/dgrijalva/jwt-go/request"
 	"github.com/gorilla/mux"
 	"github.com/joho/godotenv"
 	"log"
@@ -12,6 +17,13 @@ import (
 )
 
 var JwtSecret []byte
+
+type WebsocketUpdate struct {
+	IP   string
+	Port string
+}
+
+var JWTStatus = make(map[string]WebsocketUpdate) // connected clients
 
 func main() {
 	err := godotenv.Load(".env")
@@ -45,8 +57,6 @@ func main() {
 	//}
 }
 
-//TODO Generate JWT in Lambda, and use fields here to ensure that the right proxy(ies) get created
-
 func RunServer(port string) {
 	muxx := makeMuxRouter()
 
@@ -58,44 +68,131 @@ func RunServer(port string) {
 		MaxHeaderBytes: 1 << 20,
 	}
 	log.Println("Server is now running on port " + port)
+
 	log.Fatal(s.ListenAndServe()) //Key and cert are already set in the TLS config
 }
 
 func makeMuxRouter() http.Handler {
 	muxRouter := mux.NewRouter()
 
-	//TODO Remove "OPTIONS"(?) and all CORS stuff for server deployment
-	muxRouter.HandleFunc("/login", Login).Methods("GET", "OPTIONS")
+	muxRouter.HandleFunc("/token", TokenTester).Methods("POST", "OPTIONS")
+	muxRouter.HandleFunc("/tokenStatus/{jwt}", handleGetStatus).Methods("GET", "OPTIONS")
 
 	return muxRouter
 }
 
-func Login(w http.ResponseWriter, r *http.Request) {
+func handleGetStatus(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Access-Control-Allow-Origin", "*")
 	w.Header().Set("Access-Control-Allow-Methods", "GET")
-	w.Header().Set("Access-Control-Allow-Headers", "Authorization")
+	vars := mux.Vars(r)
+	jwtt := vars["jwt"]
 
-	defer r.Body.Close()
-
-	user, pass, _ := r.BasicAuth()
-
-	if user == "RUSTLED" && pass == "JIMMIES" {
-		token := jwt.New(jwt.SigningMethodHS256)
-		/* Create a map to store our claims */
-		claims := token.Claims.(jwt.MapClaims)
-
-		/* Set token claims */
-		claims["name"] = user
-		claims["exp"] = time.Now().Add(time.Hour * 1).Unix()
-
-		/* Sign the token with our secret */
-		tokenString, _ := token.SignedString(JwtSecret)
-		fmt.Println("Created token: " + tokenString)
-
-		/* Finally, write the token to the browser window */
-		w.Write([]byte("{\"Token\": \"" + tokenString + "\"}"))
+	// Register our new client
+	if val, ok := JWTStatus[jwtt]; !ok {
+		w.Write([]byte("{\"Status\": \"Invalid JWT!\"}"))
 	} else {
-		fmt.Println("Login: " + user + ", " + pass + " FAILED")
-		w.Write([]byte("{\"Token\": \"FAIL\"}"))
+		byt, err := json.Marshal(val)
+		if err == nil {
+			w.Write(byt)
+		} else {
+			log.Println(err)
+		}
+	}
+}
+
+//Simple function to test the JWT against our signage key
+func TokenTester(w http.ResponseWriter, r *http.Request) {
+	fmt.Println("Hit token tester")
+	w.Header().Set("Access-Control-Allow-Origin", "*")
+	w.Header().Set("Access-Control-Allow-Methods", "POST")
+	w.Header().Set("Access-Control-Allow-Headers", "Token")
+
+	time.Sleep(time.Second)
+
+	claims, err := GetStructuredClaimsFromRequest(JwtSecret, r)
+	if err != nil {
+		w.Write([]byte("{\"Status\": \"INVALID\"}"))
+	} else {
+		serverType := common.Nano
+		proxyConfig := common.ProxyConfig{"http", "23024", "", ""}
+
+		if claims.Type == "t2.micro" {
+			serverType = common.Micro
+		}
+
+		serverConfig := common.CreateServerConfig(common.USWest1, serverType)
+
+		token, err := request.HeaderExtractor{"Token"}.ExtractToken(r)
+		if err != nil {
+			log.Println(err)
+		}
+
+		go waitForServerAndBcast(proxyConfig, serverConfig, time.Minute*time.Duration(claims.Duration), 1000, token)
+
+		//str := "Username:" + claims.Username + ", Expiration: " + claims.Expiration.String()
+		w.Write([]byte("{\"Status\": \"VALID\"}"))
+	}
+	fmt.Println(claims)
+}
+
+func waitForServerAndBcast(pConfig common.ProxyConfig, sConfig common.ServerConfig, duration time.Duration, bytes float64, token string) {
+	record, err := management.StartProxyAndReturnRecord(pConfig, sConfig, duration, bytes)
+	if err != nil {
+		fmt.Println(err)
+	}
+
+	update := WebsocketUpdate{IP: record.PublicIp, Port: record.PublicPort}
+
+	JWTStatus[token] = update
+}
+
+//simple test struct of basic info (expand)
+type JWTClaimFields struct {
+	//Receipt_url   string
+	DiscordID string
+	Type      string
+	Duration  int64
+	Quantity  int64
+	Data      int64
+}
+
+// extract the claims from the token
+func extractStructuredClaimsFromToken(jwtsecret []byte, tokenString string) (JWTClaimFields, error) {
+	ReturnClaims := JWTClaimFields{}
+
+	token, err := jwt.Parse(tokenString, func(token *jwt.Token) (interface{}, error) {
+		// Don't forget to validate the alg is what you expect:
+		if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
+			return nil, fmt.Errorf("Unexpected signing method: %v", token.Header["alg"])
+		}
+
+		return jwtsecret, nil
+	})
+	if token == nil {
+		return JWTClaimFields{}, errors.New("Token is invalid!")
+	}
+
+	if claims, ok := token.Claims.(jwt.MapClaims); ok && token.Valid {
+		//ReturnClaims.Receipt_url = claims["Receipt_url"].(string)
+		ReturnClaims.DiscordID = claims["DiscordID"].(string)
+		ReturnClaims.Type = claims["Type"].(string)
+		ReturnClaims.Duration = int64(claims["Duration"].(float64))
+		ReturnClaims.Quantity = int64(claims["Quantity"].(float64))
+		ReturnClaims.Data = int64(claims["Data"].(float64))
+		return ReturnClaims, nil
+	} else {
+		fmt.Println(err)
+		return JWTClaimFields{}, err
+	}
+}
+
+// Get the claims from the http request
+func GetStructuredClaimsFromRequest(secret []byte, req *http.Request) (JWTClaimFields, error) {
+	tokenString, err2 := request.HeaderExtractor{"Token"}.ExtractToken(req)
+	if err2 == nil {
+		return extractStructuredClaimsFromToken(secret, tokenString)
+	} else {
+		fmt.Println(err2)
+		return JWTClaimFields{}, err2
 	}
 }
