@@ -13,6 +13,7 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"strconv"
 	"time"
 )
 
@@ -75,7 +76,7 @@ func RunServer(port string) {
 func makeMuxRouter() http.Handler {
 	muxRouter := mux.NewRouter()
 
-	muxRouter.HandleFunc("/token", TokenTester).Methods("POST", "OPTIONS")
+	muxRouter.HandleFunc("/token", StartServerWithJWT).Methods("POST", "OPTIONS")
 	muxRouter.HandleFunc("/tokenStatus/{jwt}", handleGetStatus).Methods("GET", "OPTIONS")
 
 	return muxRouter
@@ -101,13 +102,12 @@ func handleGetStatus(w http.ResponseWriter, r *http.Request) {
 }
 
 //Simple function to test the JWT against our signage key
-func TokenTester(w http.ResponseWriter, r *http.Request) {
-	fmt.Println("Hit token tester")
+func StartServerWithJWT(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Access-Control-Allow-Origin", "*")
 	w.Header().Set("Access-Control-Allow-Methods", "POST")
 	w.Header().Set("Access-Control-Allow-Headers", "Token")
 
-	time.Sleep(time.Second)
+	time.Sleep(time.Second) // Allow for the creation time of the JWT to come into play
 
 	claims, err := GetStructuredClaimsFromRequest(JwtSecret, r)
 	if err != nil {
@@ -127,7 +127,8 @@ func TokenTester(w http.ResponseWriter, r *http.Request) {
 			log.Println(err)
 		}
 
-		go waitForServerAndBcast(proxyConfig, serverConfig, time.Minute*time.Duration(claims.Duration), 1000, token)
+		gb := claims.Data
+		go waitForServerAndBcast(proxyConfig, serverConfig, time.Hour*time.Duration(claims.Duration), float64(gb)*1000000000.0, token)
 
 		//str := "Username:" + claims.Username + ", Expiration: " + claims.Expiration.String()
 		w.Write([]byte("{\"Status\": \"VALID\"}"))
@@ -136,6 +137,8 @@ func TokenTester(w http.ResponseWriter, r *http.Request) {
 }
 
 func waitForServerAndBcast(pConfig common.ProxyConfig, sConfig common.ServerConfig, duration time.Duration, bytes float64, token string) {
+	log.Println("Starting server with duration: " + duration.String() + " and data= " + strconv.FormatFloat(bytes, 'f', -1, 64) + " bytes")
+
 	record, err := management.StartProxyAndReturnRecord(pConfig, sConfig, duration, bytes)
 	if err != nil {
 		fmt.Println(err)
