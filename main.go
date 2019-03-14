@@ -128,6 +128,7 @@ func StartServerWithJWT(w http.ResponseWriter, r *http.Request) {
 		}
 
 		gb := claims.Data
+		//go waitForServerAndBcast(proxyConfig, serverConfig, time.Hour*time.Duration(claims.Duration), float64(gb)*1000000000.0, token)
 		go waitForServerAndBcast(proxyConfig, serverConfig, time.Hour*time.Duration(claims.Duration), float64(gb)*1000000000.0, token)
 
 		//str := "Username:" + claims.Username + ", Expiration: " + claims.Expiration.String()
