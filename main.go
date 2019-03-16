@@ -11,20 +11,26 @@ import (
 	"github.com/gorilla/mux"
 	"github.com/joho/godotenv"
 	"log"
+	"math/rand"
 	"net/http"
 	"os"
 	"strconv"
+	"sync"
 	"time"
 )
 
 var JwtSecret []byte
 
-type WebsocketUpdate struct {
+type ProxyServerListing struct {
 	IP   string
 	Port string
 }
 
-var JWTStatus = make(map[string]WebsocketUpdate) // connected clients
+var JWTStatus = make(map[string][]*management.ServerRecord) // connected clients
+var lock = sync.RWMutex{}
+
+const MinPort = 32768
+const MaxPort = 61000
 
 func main() {
 	err := godotenv.Load(".env")
@@ -78,8 +84,16 @@ func makeMuxRouter() http.Handler {
 
 	muxRouter.HandleFunc("/token", StartServerWithJWT).Methods("POST", "OPTIONS")
 	muxRouter.HandleFunc("/tokenStatus/{jwt}", handleGetStatus).Methods("GET", "OPTIONS")
+	muxRouter.HandleFunc("/test", handleTest).Methods("GET", "OPTIONS")
 
 	return muxRouter
+}
+
+func handleTest(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Access-Control-Allow-Origin", "*")
+	w.Header().Set("Access-Control-Allow-Methods", "GET")
+
+	w.Write([]byte(`[{"InstanceId":"i-083f83365ee655125","Region":"us-west-1","User":"","Pass":"","PublicIp":"13.57.209.45","PublicPort":"56473","Constraints":{"DestructionTime":"2019-03-16T19:23:19.2045263-06:00","TotalByteCap":1000000000},"Status":{"CreationTime":"2019-03-15T19:23:19.2045263-06:00","InboundBytesUsed":0,"OutboundBytesUsed":0,"IsRunning":true,"IsDestroyed":false}},{"InstanceId":"i-083f83365ee655125","Region":"us-west-1","User":"","Pass":"","PublicIp":"13.57.209.45","PublicPort":"56473","Constraints":{"DestructionTime":"2019-03-16T19:23:19.2045263-06:00","TotalByteCap":1000000000},"Status":{"CreationTime":"2019-03-15T19:23:19.2045263-06:00","InboundBytesUsed":0,"OutboundBytesUsed":0,"IsRunning":true,"IsDestroyed":false}}]`))
 }
 
 func handleGetStatus(w http.ResponseWriter, r *http.Request) {
@@ -88,7 +102,9 @@ func handleGetStatus(w http.ResponseWriter, r *http.Request) {
 	vars := mux.Vars(r)
 	jwtt := vars["jwt"]
 
-	// Register our new client
+	lock.RLock()
+	defer lock.RUnlock()
+
 	if val, ok := JWTStatus[jwtt]; !ok {
 		w.Write([]byte("{\"Status\": \"Invalid JWT!\"}"))
 	} else {
@@ -114,7 +130,7 @@ func StartServerWithJWT(w http.ResponseWriter, r *http.Request) {
 		w.Write([]byte("{\"Status\": \"INVALID\"}"))
 	} else {
 		serverType := common.Nano
-		proxyConfig := common.ProxyConfig{"http", "23024", "", ""}
+		proxyConfig := common.ProxyConfig{"http", "99999", "", ""}
 
 		if claims.Type == "t2.micro" {
 			serverType = common.Micro
@@ -129,7 +145,14 @@ func StartServerWithJWT(w http.ResponseWriter, r *http.Request) {
 
 		gb := claims.Data
 		//go waitForServerAndBcast(proxyConfig, serverConfig, time.Hour*time.Duration(claims.Duration), float64(gb)*1000000000.0, token)
-		go waitForServerAndBcast(proxyConfig, serverConfig, time.Hour*time.Duration(claims.Duration), float64(gb)*1000000000.0, token)
+
+		for i := 0; i < int(claims.Quantity); i++ {
+			port := rand.Intn(MaxPort-MinPort) + MinPort
+
+			proxyConfig.Port = strconv.FormatInt(int64(port), 10)
+
+			go waitForServerAndBcast(proxyConfig, serverConfig, time.Hour*time.Duration(claims.Duration), float64(gb)*1000000000.0, token)
+		}
 
 		//str := "Username:" + claims.Username + ", Expiration: " + claims.Expiration.String()
 		w.Write([]byte("{\"Status\": \"VALID\"}"))
@@ -145,9 +168,10 @@ func waitForServerAndBcast(pConfig common.ProxyConfig, sConfig common.ServerConf
 		fmt.Println(err)
 	}
 
-	update := WebsocketUpdate{IP: record.PublicIp, Port: record.PublicPort}
+	lock.Lock()
+	defer lock.Unlock()
 
-	JWTStatus[token] = update
+	JWTStatus[token] = append(JWTStatus[token], record)
 }
 
 //simple test struct of basic info (expand)

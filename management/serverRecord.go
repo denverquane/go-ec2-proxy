@@ -24,8 +24,8 @@ type ServerRecord struct {
 	PublicPort string
 
 	//private elements; shouldn't modify these directly
-	constraints ServerConstraints
-	status      ServerStatus
+	Constraints ServerConstraints
+	Status      ServerStatus
 }
 
 func (sr *ServerRecord) FetchCurrentDataUsage() {
@@ -35,11 +35,11 @@ func (sr *ServerRecord) FetchCurrentDataUsage() {
 	}
 
 	in, out := metrics.FetchNetworkThroughputForInstance(creds, sr.Region, sr.InstanceId)
-	sr.status.InboundBytesUsed = in
-	sr.status.OutboundBytesUsed = out
+	sr.Status.InboundBytesUsed = in
+	sr.Status.OutboundBytesUsed = out
 
-	fmt.Println(sr.InstanceId + " Gb in: " + strconv.FormatFloat(sr.status.InboundBytesUsed/KbInGb, 'f', -1, 64))
-	fmt.Println(sr.InstanceId + " Gb out: " + strconv.FormatFloat(sr.status.OutboundBytesUsed/KbInGb, 'f', -1, 64))
+	fmt.Println(sr.InstanceId + " Gb in: " + strconv.FormatFloat(sr.Status.InboundBytesUsed/KbInGb, 'f', -1, 64))
+	fmt.Println(sr.InstanceId + " Gb out: " + strconv.FormatFloat(sr.Status.OutboundBytesUsed/KbInGb, 'f', -1, 64))
 }
 
 func StartProxyAndReturnRecord(pc common.ProxyConfig, sc common.ServerConfig, duration time.Duration, byteCap float64) (*ServerRecord, error) {
@@ -76,18 +76,18 @@ func monitorUsageAsync(record *ServerRecord) {
 		time.Sleep(time.Minute * CloudwatchRefreshMinutesInterval)
 		record.FetchCurrentDataUsage()
 
-		if record.constraints.DestructionTime.Before(time.Now()) {
+		if record.Constraints.DestructionTime.Before(time.Now()) {
 			fmt.Println("Time ran out for the server, killing!")
 			kill = true
-		} else if record.constraints.TotalByteCap < (record.status.OutboundBytesUsed + record.status.InboundBytesUsed) {
+		} else if record.Constraints.TotalByteCap < (record.Status.OutboundBytesUsed + record.Status.InboundBytesUsed) {
 			fmt.Println("Server has used too much data, killing!")
 			kill = true
 		}
 	}
 
 	destroy.TerminateInstance(record.Region, record.InstanceId)
-	record.status.IsDestroyed = true
-	record.status.IsRunning = false
+	record.Status.IsDestroyed = true
+	record.Status.IsRunning = false
 }
 
 type ServerConstraints struct {
