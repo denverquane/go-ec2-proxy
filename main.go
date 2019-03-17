@@ -123,7 +123,7 @@ func StartServerWithJWT(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Access-Control-Allow-Methods", "POST")
 	w.Header().Set("Access-Control-Allow-Headers", "Token")
 
-	time.Sleep(time.Second) // Allow for the creation time of the JWT to come into play
+	time.Sleep(2 * time.Second) // Allow for the creation time of the JWT to come into play
 
 	claims, err := GetStructuredClaimsFromRequest(JwtSecret, r)
 	if err != nil {
